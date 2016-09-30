@@ -42,6 +42,13 @@ then you can get both instances in single memcached query.
     event = result['event']
 
 
+In above code, :code:`User.cache.get_query(id=user_id)` and :code:`EventCacheOnSlug(event_slug)`
+are lazy cache queries which contains passed parameters to be used while
+creating key. :code:`User.cache.get_query(id=user_id)` is lazy
+counterpart of :code:`User.cache.get(id=user_id)` and
+:code:`EventCacheOnSlug(event_slug)` is lazy counterpart of
+:code:`EventCacheOnSlug.get(event_slug)`.
+
 :code:`batch_query.get()` returns a dict with same keys given to
 BatchCacheQuery() and values as corresponding queries' result evaluated.
 
@@ -57,7 +64,7 @@ to it.
 
 
 Another example, if you have a list of user_ids and you want corresponding User
-instannces then you get them by
+instances then you can get them by
 
 .. code-block:: python
 

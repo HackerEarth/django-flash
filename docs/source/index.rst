@@ -21,5 +21,4 @@ Content
     model_cache_manager
     queryset_cache
     batch_cache_query
-    related_caches
     miscellaneous
