@@ -218,7 +218,7 @@ def eval_object(obj):
                         extend_lazy_refs = False
                 if extend_lazy_refs:
                     lazy_refs = l_refs + lazy_refs
-                    nonlazy_refs = nl_refs + nl_refs
+                    nonlazy_refs = nl_refs + nonlazy_refs
             if delete_metaref:
                 metaref.delete()
         if cache_refs:
