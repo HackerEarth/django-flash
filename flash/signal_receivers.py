@@ -11,7 +11,7 @@ from flash.signals import queryset_update
 from flash.constants import CACHE_TIME_S
 
 
-def get_cache_keys_to_be_invalidated(model, instance, signal):
+def get_cache_keys_to_be_invalidated(model, instance, signal, using):
     cache_classes = BaseModelQueryCacheMeta.model_caches[model]
 
     unset_cache_keys = []
@@ -21,12 +21,14 @@ def get_cache_keys_to_be_invalidated(model, instance, signal):
         if cache_class.invalidation == InvalidationType.OFF:
             continue
         try:
-            cache_keys = list(cache_class.get_keys_to_be_invalidated(
-                instance, signal))
+            cache_class_instance = cache_class()
+            cache_keys = list(cache_class_instance.get_keys_to_be_invalidated(
+                instance, signal, using))
             if cache_class.invalidation == InvalidationType.UNSET:
                 unset_cache_keys.extend(cache_keys)
             elif cache_class.invalidation == InvalidationType.DYNAMIC:
-                cache_keys = [cache_class.get_stale_key(key) for key in cache_keys]
+                cache_keys = [cache_class_instance.get_stale_key(key)
+                    for key in cache_keys]
                 dynamic_cache_keys.extend(cache_keys)
         except Exception:
             if settings.DEBUG:
@@ -37,9 +39,10 @@ def get_cache_keys_to_be_invalidated(model, instance, signal):
 def invalidate_caches(unset_cache_keys, dynamic_cache_keys):
     IS_TEST = getattr(settings, 'TEST', False)
     if settings.DEBUG and not IS_TEST and unset_cache_keys:
-        print 'Flash: Invalidating cache keys (unsetting)', unset_cache_keys
+        print ('Flash: Invalidating cache keys (unsetting)', unset_cache_keys)
     if settings.DEBUG and not IS_TEST and dynamic_cache_keys:
-        print 'Flash: Invalidating cache keys (dynamic unsetting)', dynamic_cache_keys
+        print ('Flash: Invalidating cache keys (dynamic unsetting)',
+                dynamic_cache_keys)
     stale_data = StaleData(time.time())
     if unset_cache_keys:
         key_value_map = {key: stale_data for key in unset_cache_keys}
@@ -53,7 +56,7 @@ def instance_post_save_receiver(sender, instance, **kwargs):
     try:
         model = sender
         cache_keys_tuple = get_cache_keys_to_be_invalidated(
-                model, instance, 'post_save')
+                model, instance, 'post_save', kwargs['using'])
         invalidate_caches(*cache_keys_tuple)
     except:
         if settings.DEBUG:
@@ -68,7 +71,7 @@ def instance_m2m_changed_receiver(sender, instance, action, reverse, model,
             return
         obj = (instance, reverse, model, pk_set)
         cache_keys_tuple = get_cache_keys_to_be_invalidated(
-                sender, obj, 'm2m_changed')
+                sender, obj, 'm2m_changed', kwargs['using'])
         invalidate_caches(*cache_keys_tuple)
     except:
         if settings.DEBUG:
@@ -80,7 +83,7 @@ def instance_pre_delete_receiver(sender, instance, **kwargs):
     try:
         model = sender
         cache_keys_tuple = get_cache_keys_to_be_invalidated(
-                model, instance, 'pre_delete')
+                model, instance, 'pre_delete', kwargs['using'])
         invalidate_caches(*cache_keys_tuple)
     except:
         if settings.DEBUG:
@@ -102,7 +105,8 @@ def queryset_update_receiver(sender, queryset, update_kwargs, **kwargs):
                 instance = deepcopy(instance)
                 update_statediff(instance, update_kwargs)
                 unset_keys, dynamic_keys = get_cache_keys_to_be_invalidated(
-                        model, instance, 'instance_update')
+                        model, instance, 'instance_update',
+                        kwargs['using'])
                 unset_cache_keys.extend(unset_keys)
                 dynamic_cache_keys.extend(dynamic_keys)
             except:

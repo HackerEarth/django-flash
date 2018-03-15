@@ -104,6 +104,7 @@ class InvalidationType(object):
     RESET = 2
     DYNAMIC = 3
 
+USING_KWARG = '__using'
 
 class WrappedValue(object):
     def __init__(self, value, version, timestamp):
@@ -141,6 +142,10 @@ class Cache(six.with_metaclass(ABCMeta, object)):
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
+
+    @property
+    def key(self):
+        return self.get_key(*self.args, **self.kwargs)
 
     @abstractmethod
     def get_key(self, *args, **kwargs):
@@ -374,6 +379,9 @@ class Cache(six.with_metaclass(ABCMeta, object)):
                 value, key_value_dict, *args, **kwargs)
         yield value
 
+    def resolve_coroutine(self):
+        return self.get_coroutine(*self.args, **self.kwargs)
+
     def get(self, *args, **kwargs):
         """ Returns the yielded vale from get_coroutine method
         """
@@ -385,6 +393,9 @@ class Cache(six.with_metaclass(ABCMeta, object)):
             result_dict, stale_data_dict = cache_get_many(keys)
         value = coroutine.send((result_dict, stale_data_dict))
         return value
+
+    def resolve(self):
+        return self.get(*self.args, **self.kwargs)
 
     def reset(self, *args, **kwargs):
         """ Resets the value in cache using fallback method for given params
@@ -429,9 +440,7 @@ class BatchCacheQuery(object):
         value_dict = {}
 
         for key, cache_query in self.queries.items():
-            coroutine = cache_query.get_coroutine(
-                            *cache_query.args,
-                            **cache_query.kwargs)
+            coroutine = cache_query.resolve_coroutine()
             cache_keys = coroutine.send(None)
             all_cache_keys.update(cache_keys)
             coroutines_dict[key] = (coroutine, cache_keys)
@@ -485,14 +494,12 @@ class BaseModelQueryCacheMeta(ABCMeta):
         if is_abstract_class(self):
             return
 
-        # get the singleton instance of `self` class and register it here
-        # in model_caches dict corressponding to all the models against which
-        # cache should get invalidated.
-        ncls_instance = self()
-        for model in ncls_instance.get_invalidation_models():
-            self.model_caches[model].append(ncls_instance)
+        # register self in model_caches dict corressponding to all the models
+        # against which cache should get invalidated.
+        for model in self.get_invalidation_models():
+            self.model_caches[model].append(self)
 
-        target_models = ncls_instance.get_cache_model()
+        target_models = self.get_cache_model()
         if target_models:
             if not isinstance(target_models, (list, tuple)):
                 # If it's a single model
@@ -507,18 +514,12 @@ class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
     """
     generic_fields_support = True
 
-    def __new__(cls, *args, **kwargs):
-        """ Returns the same singleton instance when class is called with no
-        args and kwargs.
-
-        TODO: when args or kwargs are passed return a new instance
-        which will be used for cache aggregation. **future work**
-        """
-        if args or kwargs:
-            return super(BaseModelQueryCache, cls).__new__(cls)
-        if not hasattr(cls, '_instance'):
-            cls._instance = super(BaseModelQueryCache, cls).__new__(cls)
-        return cls._instance
+    def __init__(self, *args, **kwargs):
+        if USING_KWARG in kwargs:
+            self.using = kwargs.pop(USING_KWARG)
+        else:
+            self.using = self.get_using()
+        super(BaseModelQueryCache, self).__init__(*args, **kwargs)
 
     @abstractproperty
     def model(self):
@@ -531,8 +532,13 @@ class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
     def key_fields(self):
         pass
 
+    def get_using(self):
+        return self.model.objects.get_queryset().db
+
     @instancemethod
     def get(self, *args, **kwargs):
+        if USING_KWARG in kwargs:
+            self.using = kwargs.pop(USING_KWARG)
         return super(BaseModelQueryCache, self).get(*args, **kwargs)
 
     @instancemethod
@@ -544,7 +550,7 @@ class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
         pass
 
     @abstractmethod
-    def get_keys_to_be_invalidated(self, instance, signal):
+    def get_keys_to_be_invalidated(self, instance, signal, using):
         pass
 
     def get_field_dict(self, *args, **kwargs):
@@ -576,9 +582,11 @@ class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
                         raise KeyFieldNotPassed(field_name)
         return field_dict
 
+    @instancemethod
     def get_key(self, *args, **kwargs):
         cls_name = self.__class__.__name__
-        key = '%s__%s' % (self.cache_type, cls_name)
+        using = kwargs.pop(USING_KWARG, self.using)
+        key = '%s__%s__%s' % (self.cache_type, using, cls_name)
         field_dict = self.get_field_dict(*args, **kwargs)
 
         for field_name in self.key_fields:
@@ -614,10 +622,10 @@ class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
                     # fallback method to get rel_model
                     rel_model = value.__class__
                 value = getattr(value, rel_model._meta.pk.attname)
-            "
+            """
             if isinstance(value, unicode):
                 value = value.encode('utf-8')
-            "
+            """
             key += '__%s' % str(value)
         key += '__v%s' % self.version
         key = memcache_key_escape(key)
@@ -636,7 +644,7 @@ class InstanceCacheMeta(BaseModelQueryCacheMeta):
         model = ncls.model
         # store the new class's single instance with its model
         # in instance_cache_classes dict
-        cls.instance_cache_classes[model].append(ncls())
+        cls.instance_cache_classes[model].append(ncls)
         if (six.get_unbound_function(ncls.get_instance) ==
                 six.get_unbound_function(InstanceCache.get_instance)):
             # if the get_instance method is not overriden then mark the class
@@ -663,10 +671,10 @@ class SameModelInvalidationCache(object):
     def _get_invalidation_models(self):
         return [self.model]
 
-    def _get_keys_to_be_invalidated(self, instance, signal):
+    def _get_keys_to_be_invalidated(self, instance, signal, using):
         keys = []
         for params in self.get_invalidation_params_list_(instance, signal):
-            keys.append(self.get_key(*params))
+            keys.append(self.get_key(*params, **{USING_KWARG: using}))
         return keys
 
     def get_invalidation_params_list_(self, instance, signal):
@@ -779,17 +787,18 @@ class InstanceCache(six.with_metaclass(InstanceCacheMeta,
                 'timeout': cls.timeout,
             })
             # And store it's instance in related_caches
-            cls.related_caches[relation] = related_cache_class()
+            cls.related_caches[relation] = related_cache_class
 
     @instancemethod
     def get_cache_model(self):
         return self.model
 
+    @instancemethod
     def get_invalidation_models(self):
         return self._get_invalidation_models()
 
-    def get_keys_to_be_invalidated(self, instance, signal):
-        return self._get_keys_to_be_invalidated(instance, signal)
+    def get_keys_to_be_invalidated(self, instance, signal, using):
+        return self._get_keys_to_be_invalidated(instance, signal, using)
 
     def get_extra_keys(self, *args, **kwargs):
         """ Returns the keys from assosiated related cache classes
@@ -809,7 +818,7 @@ class InstanceCache(six.with_metaclass(InstanceCacheMeta,
         Can be overriden in derived classes.
         """
         try:
-            return self.model.objects.get(**filter_dict)
+            return self.model.objects.using(self.using).get(**filter_dict)
         except self.model.DoesNotExist:
             if self.is_simple:
                 # Returning the None so that it gets cached.
@@ -939,10 +948,10 @@ class RelatedModelInvalidationCache(object):
     def _get_invalidation_models(self):
         return [self.model] + self.rel_models.keys()
 
-    def _get_keys_to_be_invalidated(self, instance, signal):
+    def _get_keys_to_be_invalidated(self, instance, signal, using):
         keys = []
         for params in self.get_invalidation_params_list(instance, signal):
-            keys.append(self.get_key(*params))
+            keys.append(self.get_key(*params, **{USING_KWARG: using}))
         return keys
 
     def get_invalidation_params_list(self, instance, signal):
@@ -1040,15 +1049,16 @@ class RelatedInstanceCache(six.with_metaclass(RelatedInstanceCacheMeta,
     def get_cache_model(self):
         return self.rel_models_inv[self.relation]
 
+    @instancemethod
     def get_invalidation_models(self):
         return RelatedModelInvalidationCache._get_invalidation_models(self)
 
-    def get_keys_to_be_invalidated(self, instance, signal):
+    def get_keys_to_be_invalidated(self, instance, signal, using):
         return RelatedModelInvalidationCache._get_keys_to_be_invalidated(
-                self, instance, signal)
+                self, instance, signal, using)
 
     def get_instance(self, **filter_dict):
-        dep_instance = self.model.objects.select_related(
+        dep_instance = self.model.objects.using(self.using).select_related(
                 self.relation).get(**filter_dict)
         instance = dep_instance
         for rel_attr in self.relation.split('__'):
@@ -1066,7 +1076,7 @@ class QuerysetCacheMeta(BaseModelQueryCacheMeta):
         if is_abstract_class(ncls):
             return ncls
         model = ncls.model
-        cls.queryset_cache_classes[model].append(ncls())
+        cls.queryset_cache_classes[model].append(ncls)
         if (six.get_unbound_function(ncls.get_result) ==
                 six.get_unbound_function(QuerysetCache.get_result)):
             ncls.is_simple = True
@@ -1100,16 +1110,17 @@ class QuerysetCache(six.with_metaclass(QuerysetCacheMeta,
             return self.model
         return None
 
+    @instancemethod
     def get_invalidation_models(self):
         return self._get_invalidation_models()
 
-    def get_keys_to_be_invalidated(self, instance, signal):
-        return self._get_keys_to_be_invalidated(instance, signal)
+    def get_keys_to_be_invalidated(self, instance, signal, using):
+        return self._get_keys_to_be_invalidated(instance, signal, using)
 
     def get_result(self, **params):
         """ By default returns the filter queryset's result
         """
-        return list(self.model.objects.filter(**params))
+        return list(self.model.objects.using(self.using).filter(**params))
 
     def get_value_for_params(self, *args, **kwargs):
         params = self.get_field_dict(*args, **kwargs)
@@ -1169,15 +1180,17 @@ class RelatedQuerysetCache(six.with_metaclass(RelatedQuerysetCacheMeta,
     def relation(self):
         pass
 
+    @instancemethod
     def get_invalidation_models(self):
         return RelatedModelInvalidationCache._get_invalidation_models(self)
 
-    def get_keys_to_be_invalidated(self, instance, signal):
+    def get_keys_to_be_invalidated(self, instance, signal, using):
         return RelatedModelInvalidationCache._get_keys_to_be_invalidated(
-                self, instance, signal)
+                self, instance, signal, using)
 
     def get_result(self, **params):
-        qset = self.model.objects.filter(**params).select_related(self.relation)
+        qset = self.model.objects.using(self.using).filter(**params).select_related(
+            self.relation)
         return list([getattr(i, self.relation) for i in qset])
 
 
@@ -1290,7 +1303,7 @@ class ModelCacheManagerMeta(ABCMeta):
 
         # register all simple_instance_cache_classes
         # and simple_queryset_cache_classes so that `get` and `filter` methods
-        # of model cache manager can decide whcih cache class to be used
+        # of model cache manager can decide which cache class to be used
         ncls.instance_cache_classes = []
         ncls.simple_instance_cache_classes = {}
 
@@ -1372,7 +1385,7 @@ class ModelCacheManagerMeta(ABCMeta):
 class CacheNotRegistered(Exception):
     def __init__(self, model, key_fields):
         msg = ('No cache registered for model `%s` on fields '+
-               '`%s`') % (str(model), str(key_fields))
+               '`%s`') % (str(model), str(tuple(key_fields)))
         super(CacheNotRegistered, self).__init__(msg)
 
 
@@ -1436,6 +1449,8 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
                 kwargs[pk_field_name] = value
 
         for key in args_set:
+            if key == USING_KWARG:
+                continue
             try:
                 field = self.model._meta.get_field(key)
                 key_fields.append(field.name)
@@ -1460,7 +1475,7 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         if key_fields in self.simple_instance_cache_classes:
             instance_cache_class = self.simple_instance_cache_classes[key_fields]
             return instance_cache_class.get(**kwargs)
-        raise CacheNotRegistered(self.model, kwargs.keys())
+        raise CacheNotRegistered(self.model, key_fields)
 
     def get_query(self, **kwargs):
         """ Find the instance_cache_class for given params
@@ -1469,8 +1484,8 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         key_fields = self.get_key_fields(kwargs)
         if key_fields in self.simple_instance_cache_classes:
             instance_cache_class = self.simple_instance_cache_classes[key_fields]
-            return instance_cache_class.__class__(**kwargs)
-        raise CacheNotRegistered(self.model, kwargs.keys())
+            return instance_cache_class(**kwargs)
+        raise CacheNotRegistered(self.model, key_fields)
 
     def get_cache_class_for(self, *args):
         """ Find the instance_cache_class for given params
@@ -1479,7 +1494,7 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         key_fields = self.get_key_fields(args)
         if key_fields in self.simple_instance_cache_classes:
             instance_cache_class = self.simple_instance_cache_classes[key_fields]
-            return instance_cache_class.__class__
+            return instance_cache_class
         raise CacheNotRegistered(self.model, args)
 
     def get_key(self, **kwargs):
@@ -1490,7 +1505,7 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         if key_fields in self.simple_instance_cache_classes:
             instance_cache_class = self.simple_instance_cache_classes[key_fields]
             return instance_cache_class.get_key(**kwargs)
-        raise CacheNotRegistered(self.model, kwargs.keys())
+        raise CacheNotRegistered(self.model, key_fields)
 
     def filter(self, **kwargs):
         """ Find the queryset_cache_class for given params
@@ -1500,7 +1515,7 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         if key_fields in self.simple_queryset_cache_classes:
             queryset_cache_class = self.simple_queryset_cache_classes[key_fields]
             return queryset_cache_class.get(**kwargs)
-        raise CacheNotRegistered(self.model, kwargs.keys())
+        raise CacheNotRegistered(self.model, key_fields)
 
     def filter_query(self, **kwargs):
         """ Find the queryset_cache_class for given params
@@ -1509,8 +1524,8 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         key_fields = self.get_key_fields(kwargs)
         if key_fields in self.simple_queryset_cache_classes:
             queryset_cache_class = self.simple_queryset_cache_classes[key_fields]
-            return queryset_cache_class.__class__(**kwargs)
-        raise CacheNotRegistered(self.model, kwargs.keys())
+            return queryset_cache_class(**kwargs)
+        raise CacheNotRegistered(self.model, key_fields)
 
     def filter_cache_class_for(self, *args):
         """ Find the queryset_cache_class for given params
@@ -1519,7 +1534,7 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         key_fields = self.get_key_fields(args)
         if key_fields in self.simple_queryset_cache_classes:
             queryset_cache_class = self.simple_queryset_cache_classes[key_fields]
-            return queryset_cache_class.__class__
+            return queryset_cache_class
         raise CacheNotRegistered(self.model, args)
 
     def get_or_404(self, **kwargs):
