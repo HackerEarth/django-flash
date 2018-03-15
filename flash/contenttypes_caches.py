@@ -10,7 +10,7 @@ class ContentTypeCacheManager(ContentTypeManager):
         """ Tries to return ContentType instance from local cache
         If not found tries to get it from memcache
         """
-        key_error = ''
+        key_error = Exception()
 
         # Try to get it from local cache
         try:
@@ -35,7 +35,9 @@ class ContentTypeCacheManager(ContentTypeManager):
 
         return ct
 
-ContentType.add_to_class('objects_cache', ContentTypeCacheManager())
+#ContentType.add_to_class('objects_cache', ContentTypeCacheManager())
+ContentType.objects_cache = ContentTypeCacheManager()
+ContentType.objects_cache.model = ContentType
 
 
 class ContentTypeCacheOnAppModel(InstanceCache):

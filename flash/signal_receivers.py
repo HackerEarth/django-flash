@@ -1,7 +1,7 @@
 import time
 from copy import deepcopy
 
-from django.db.models.signals import pre_save, post_save, pre_delete, m2m_changed
+from django.db.models.signals import post_save, pre_delete, m2m_changed
 from django.dispatch import receiver
 from django.conf import settings
 
@@ -28,16 +28,17 @@ def get_cache_keys_to_be_invalidated(model, instance, signal):
             elif cache_class.invalidation == InvalidationType.DYNAMIC:
                 cache_keys = [cache_class.get_stale_key(key) for key in cache_keys]
                 dynamic_cache_keys.extend(cache_keys)
-        except Exception as e:
+        except Exception:
             if settings.DEBUG:
                 raise
     return unset_cache_keys, dynamic_cache_keys
 
 
 def invalidate_caches(unset_cache_keys, dynamic_cache_keys):
-    if settings.DEBUG and unset_cache_keys:
+    IS_TEST = getattr(settings, 'TEST', False)
+    if settings.DEBUG and not IS_TEST and unset_cache_keys:
         print 'Flash: Invalidating cache keys (unsetting)', unset_cache_keys
-    if settings.DEBUG and dynamic_cache_keys:
+    if settings.DEBUG and not IS_TEST and dynamic_cache_keys:
         print 'Flash: Invalidating cache keys (dynamic unsetting)', dynamic_cache_keys
     stale_data = StaleData(time.time())
     if unset_cache_keys:
@@ -45,7 +46,7 @@ def invalidate_caches(unset_cache_keys, dynamic_cache_keys):
         cache.set_many(key_value_map, timeout=CACHE_TIME_S)
     if dynamic_cache_keys:
         key_value_map = {key: stale_data for key in dynamic_cache_keys}
-        cache.set_many(key_value_map, timeout=0)
+        cache.set_many(key_value_map, timeout=None)
 
 @receiver(post_save)
 def instance_post_save_receiver(sender, instance, **kwargs):

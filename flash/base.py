@@ -1,6 +1,7 @@
 import time
 import copy
 
+from distutils.version import StrictVersion
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import defaultdict
 from functools import partial
@@ -361,7 +362,7 @@ class Cache(object):
                     # hence
                     set_value_in_cache = False
 
-                if float(django.get_version()) < 1.7:
+                if StrictVersion(django.get_version()) < StrictVersion('1.7'):
                     transaction.commit_unless_managed()
 
                 value = self.pre_set_process_value(value, *args, **kwargs)
@@ -593,25 +594,24 @@ class BaseModelQueryCache(Cache):
         field_dict = self.get_field_dict(*args, **kwargs)
 
         for field_name in self.key_fields:
-            try:
-                field = self.model._meta.get_field(field_name)
-            except:
-                if self.generic_fields_support:
-                    if hasattr(self.model, field_name):
-                        field_obj = getattr(self.model, field_name)
-                        GenericForeignKey = importGenericForeignKey()
-                        if isinstance(field_obj, GenericForeignKey):
-                            value = field_dict[field_name]
-                            if isinstance(value, tuple):
-                                ctype_id, object_id = value
-                            else:
-                                from django.contrib.contenttypes.models import ContentType
-                                ctype_id = ContentType.objects_cache.get_for_model(
-                                        value).id
-                                object_id = getattr(value, value._meta.pk.attname)
-                            key += '__%s-%s' % (ctype_id, object_id)
-                            continue
-                raise
+            if self.generic_fields_support:
+                if hasattr(self.model, field_name):
+                    field_obj = getattr(self.model, field_name)
+                    GenericForeignKey = importGenericForeignKey()
+                    if isinstance(field_obj, GenericForeignKey):
+                        value = field_dict[field_name]
+                        if isinstance(value, tuple):
+                            ctype_id, object_id = value
+                        else:
+                            from django.contrib.contenttypes.models import ContentType
+                            ctype_id = ContentType.objects_cache.get_for_model(
+                                    value).id
+                            object_id = getattr(value, value._meta.pk.attname)
+                        key += '__%s-%s' % (ctype_id, object_id)
+                        continue
+
+            field = self.model._meta.get_field(field_name)
+
             if field_name in field_dict:
                 value = field_dict[field_name]
             else:
@@ -1189,8 +1189,7 @@ class RelatedQuerysetCache(QuerysetCache, RelatedModelInvalidationCache):
                 self, instance, signal)
 
     def get_result(self, **params):
-        qset = self.model.objects.filter(**params).select_related(
-                self.relation).only(self.relation)
+        qset = self.model.objects.filter(**params).select_related(self.relation)
         return list([getattr(i, self.relation) for i in qset])
 
 

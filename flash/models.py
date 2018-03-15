@@ -81,7 +81,8 @@ class CacheDynamicVersion(models.Model):
                                self.version)
 
 import django
-if float(django.get_version()) < 1.7:
+from distutils.version import StrictVersion
+if StrictVersion(django.get_version()) < StrictVersion('1.7'):
     from flash import load_caches
     load_caches()
     from flash.base import ModelCacheManagerMeta
