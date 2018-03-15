@@ -1,3 +1,4 @@
+import six
 import time
 import copy
 
@@ -68,28 +69,18 @@ def instancemethod(method):
             return partial(method, ins)
     return MethodDisc()
 
-class ObjDoestNotExistSentinel(Exception):
-    def __init__(self, traceback=''):
-        self.traceback = traceback
-        super(ObjDoestNotExistSentinel, self).__init__(traceback)
-
-    def __unicode__(self):
-        return repr(self.traceback)
-
-    def __repr__(self):
-        return self.__unicode__()
-
 
 class DontCache(object):
     def __init__(self, val):
         self.inner_val = val
 
 
+@six.python_2_unicode_compatible
 class StaleData(object):
     def __init__(self, timestamp):
         self.timestamp = timestamp
 
-    def __unicode__(self):
+    def __str__(self):
         return "StaleData(timestamp=%s)" % self.timestamp
 
 
@@ -98,7 +89,7 @@ def cache_get_many(keys):
     result_dict = {}
     stale_data_dict = {}
 
-    for key, value in d.iteritems():
+    for key, value in d.items():
         if isinstance(value, StaleData):
             stale_data_dict[key] = value
         else:
@@ -121,17 +112,15 @@ class WrappedValue(object):
         self.timestamp = timestamp
 
 
-class Cache(object):
+class Cache(six.with_metaclass(ABCMeta, object)):
     """ The very base class for all cache classes.
 
         Methods decorated with abstractmethod or abstractproperty
         have to be implemented by derived classes.
 
         It's necessary to put ABCMeta or its derived class to put
-        as __metaclass__ to achieve above constraints.
+        as metaclass to achieve above constraints.
     """
-    __metaclass__ = ABCMeta
-
     # Derived class may provide serializer (E.g. for compression)
     serializer = None
 
@@ -266,7 +255,7 @@ class Cache(object):
             key_value_dict = {}
         key_value_dict[key] = value
 
-        for key_, value_ in key_value_dict.iteritems():
+        for key_, value_ in key_value_dict.items():
             if key_ in stale_data_dict:
                 current_value_dict = cache.get_many([key_])
                 if key_ in current_value_dict:
@@ -439,7 +428,7 @@ class BatchCacheQuery(object):
         coroutines_dict = {}
         value_dict = {}
 
-        for key, cache_query in self.queries.iteritems():
+        for key, cache_query in self.queries.items():
             coroutine = cache_query.get_coroutine(
                             *cache_query.args,
                             **cache_query.kwargs)
@@ -511,12 +500,11 @@ class BaseModelQueryCacheMeta(ABCMeta):
             for target_model in target_models:
                 self.model_caches_on_target_model[target_model].append(self)
 
-class BaseModelQueryCache(Cache):
+
+class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
     """ Base class for all cache classes which cache some query's result
         on assosiated model.
     """
-    __metaclass__ = BaseModelQueryCacheMeta
-
     generic_fields_support = True
 
     def __new__(cls, *args, **kwargs):
@@ -626,8 +614,10 @@ class BaseModelQueryCache(Cache):
                     # fallback method to get rel_model
                     rel_model = value.__class__
                 value = getattr(value, rel_model._meta.pk.attname)
+            "
             if isinstance(value, unicode):
                 value = value.encode('utf-8')
+            "
             key += '__%s' % str(value)
         key += '__v%s' % self.version
         key = memcache_key_escape(key)
@@ -647,7 +637,8 @@ class InstanceCacheMeta(BaseModelQueryCacheMeta):
         # store the new class's single instance with its model
         # in instance_cache_classes dict
         cls.instance_cache_classes[model].append(ncls())
-        if ncls.get_instance.im_func == InstanceCache.get_instance.im_func:
+        if (six.get_unbound_function(ncls.get_instance) ==
+                six.get_unbound_function(InstanceCache.get_instance)):
             # if the get_instance method is not overriden then mark the class
             # as simple
             ncls.is_simple = True
@@ -754,7 +745,8 @@ class SameModelInvalidationCache(object):
         return params_list
 
 
-class InstanceCache(BaseModelQueryCache, SameModelInvalidationCache):
+class InstanceCache(six.with_metaclass(InstanceCacheMeta,
+        BaseModelQueryCache, SameModelInvalidationCache)):
     """ This class is used when an instance of a model is cached on
     some fields of same model.
 
@@ -765,8 +757,6 @@ class InstanceCache(BaseModelQueryCache, SameModelInvalidationCache):
     3) select_related: list of related instances    (attribute)
     4) get_instance : custom method to get instance (method)
     """
-    __metaclass__ = InstanceCacheMeta
-
     cache_type = 'InstanceCache'
 
     @abstractproperty
@@ -1026,7 +1016,8 @@ class RelatedModelInvalidationCache(object):
 
 
 
-class RelatedInstanceCache(InstanceCache, RelatedModelInvalidationCache):
+class RelatedInstanceCache(six.with_metaclass(RelatedInstanceCacheMeta,
+                           InstanceCache, RelatedModelInvalidationCache)):
     """ This class is used when an instance through a related field is cached on
         some fields of a model.
 
@@ -1037,8 +1028,6 @@ class RelatedInstanceCache(InstanceCache, RelatedModelInvalidationCache):
         3) relation: related field_name                 (* attribute)
         4) get_instance : custom method to get instance (method)
     """
-    __metaclass__ = RelatedInstanceCacheMeta
-
     generic_fields_support = False
 
     cache_type = 'RelatedInstanceCache'
@@ -1078,14 +1067,16 @@ class QuerysetCacheMeta(BaseModelQueryCacheMeta):
             return ncls
         model = ncls.model
         cls.queryset_cache_classes[model].append(ncls())
-        if ncls.get_result.im_func == QuerysetCache.get_result.im_func:
+        if (six.get_unbound_function(ncls.get_result) ==
+                six.get_unbound_function(QuerysetCache.get_result)):
             ncls.is_simple = True
         else:
             ncls.is_simple = False
         return ncls
 
 
-class QuerysetCache(BaseModelQueryCache, SameModelInvalidationCache):
+class QuerysetCache(six.with_metaclass(QuerysetCacheMeta,
+                    BaseModelQueryCache, SameModelInvalidationCache)):
     """ This class is used when result of filter queryset or its
         descendent queryset of a model is cached on some fields of same model.
 
@@ -1095,8 +1086,6 @@ class QuerysetCache(BaseModelQueryCache, SameModelInvalidationCache):
         2) key_fields: list of field_names              (* attribute)
         4) get_result : custom method to get result     (method)
     """
-    __metaclass__ = QuerysetCacheMeta
-
     cache_type = 'QuerysetCache'
 
     caching_model_instances = True
@@ -1156,7 +1145,8 @@ class RelatedQuerysetCacheMeta(QuerysetCacheMeta):
         return ncls
 
 
-class RelatedQuerysetCache(QuerysetCache, RelatedModelInvalidationCache):
+class RelatedQuerysetCache(six.with_metaclass(RelatedQuerysetCacheMeta,
+                           QuerysetCache, RelatedModelInvalidationCache)):
     """ This class is used when result of filter queryset or its descendent
         queryet through a related field is cached on some fields of a model.
 
@@ -1167,8 +1157,6 @@ class RelatedQuerysetCache(QuerysetCache, RelatedModelInvalidationCache):
         3) relation: related field_name                 (* attribute)
         4) get_result : custom method to get result     (method)
     """
-    __metaclass__ = RelatedQuerysetCacheMeta
-
     generic_fields_support = False
 
     cache_type = 'RelatedQuerysetCache'
@@ -1214,10 +1202,9 @@ class QuerysetExistsCache(QuerysetCache):
         return bool(value)
 
 
-class CacheManager(object):
+class CacheManager(six.with_metaclass(ABCMeta, object)):
     """ Base class for model or non model based cache managers
     """
-    __metaclass__ = ABCMeta
 
 
 class CachedReverseSingleRelatedObjectDescriptor(
@@ -1268,7 +1255,7 @@ class ModelCacheManagerMeta(ABCMeta):
 
         if hasattr(model, 'CacheMeta'):
             cachemeta_attrs = {}
-            for key, value in model.CacheMeta.__dict__.iteritems():
+            for key, value in model.CacheMeta.__dict__.items():
                 if not key.startswith('_'):
                     cachemeta_attrs[key] = value
 
@@ -1278,10 +1265,10 @@ class ModelCacheManagerMeta(ABCMeta):
                 'cached_foreignkeys'
             ]
 
-            for key, value in cachemeta_attrs.iteritems():
+            for key, value in cachemeta_attrs.items():
                 if key in mergable_keys:
                     if (isinstance(value, (tuple, list)) and
-                            own_attrs.has_key(key) and
+                            key in own_attrs and
                             [i for i in value if i in own_attrs[key]]):
                         assert False, "`%s` in CacheMeta and %s should not have common values" % (
                             key, args[0])
@@ -1353,7 +1340,7 @@ class ModelCacheManagerMeta(ABCMeta):
 
     @classmethod
     def patch_cached_foreignkeys(cls):
-        for model, cached_foreignkeys in cls.model_cached_foreignkeys.iteritems():
+        for model, cached_foreignkeys in cls.model_cached_foreignkeys.items():
             for key in cached_foreignkeys:
                 try:
                     rel_model = model._meta.get_field(key).rel.to
@@ -1389,9 +1376,8 @@ class CacheNotRegistered(Exception):
         super(CacheNotRegistered, self).__init__(msg)
 
 
-class ModelCacheManager(CacheManager):
-    __metaclass__ = ModelCacheManagerMeta
-
+class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
+                        CacheManager)):
     version = 0
     timeout = flash_settings.DEFAULT_TIMEOUT
 

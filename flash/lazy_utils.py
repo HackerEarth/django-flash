@@ -79,7 +79,7 @@ class LazyObjectRef(object):
 
 def iter_refs(obj, lazy_only=False):
     if isinstance(obj, list):
-        for i in xrange(len(obj)):
+        for i in range(len(obj)):
             val = obj[i]
             if not lazy_only or isinstance(val, (Lazy, LazyCall)):
                 yield ListItemRef(obj, i)

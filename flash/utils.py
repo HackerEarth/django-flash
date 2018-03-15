@@ -4,8 +4,10 @@ from collections import defaultdict
 
 
 def memcache_key_escape(key):
+    """
     if isinstance(key, unicode):
         key = key.encode('utf-8')
+    """
     if not key.isalnum():
         chars = []
         for c in key:

@@ -30,7 +30,7 @@ class ModelStateDiff(object):
             if not isinstance(diff, AttrDict):
                 diff = AttrDict(diff)
                 state['diff'] = diff
-                for attr, val in diff.iteritems():
+                for attr, val in diff.items():
                     if not isinstance(val, Diff):
                         diff[attr] = Diff(**val)
         self.state = state['state']
@@ -103,7 +103,7 @@ def pre_save_statediff(sender, instance, **kwargs):
             if hasattr(instance, field.attname):
                 post_value = getattr(instance, field.attname)
                 if not instance._state.adding:
-                    if instance._statediff.state.has_key(field.attname):
+                    if field.attname in instance._statediff.state:
                         pre_value = instance._statediff.state.get(field.attname)
                         if not post_value == pre_value:
                             instance._statediff.diff[field.attname] = Diff(

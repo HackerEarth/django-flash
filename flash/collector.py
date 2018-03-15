@@ -1,3 +1,5 @@
+import six
+
 from collections import defaultdict
 from functools import wraps
 
@@ -45,7 +47,7 @@ class LazyCollectorMeta(type):
     def check_collector(self):
         assert hasattr(self, 'collector')
         assert isinstance(self.collector, dict)
-        for key, value in self.collector.iteritems():
+        for key, value in self.collector.items():
             assert isinstance(key, basestring)
             assert isinstance(value, ltype)
             for v in value:
@@ -136,9 +138,8 @@ class LazyCollectorMeta(type):
         return LazyCall(func, self, *args)
 
 
-class LazyCollector(object):
-    __metaclass__ = LazyCollectorMeta
-
+class LazyCollector(six.with_metaclass(LazyCollectorMeta, object)):
+    pass
 
 def connect(from_nodes, to_node, cache_hit=False):
     if not isinstance(from_nodes, ltype):
