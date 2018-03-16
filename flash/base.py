@@ -418,6 +418,13 @@ class Cache(six.with_metaclass(ABCMeta, object)):
             value = self.pre_set_process_value(value, **params)
         self._set(key, value, force_update=True)
 
+    def resolve_async(self):
+        from .loader import FlashCacheLoader
+        from core.loader_context import LoadersContext
+
+        loader = LoadersContext.get_loader_for(FlashCacheLoader)
+        return loader.load(self)
+
 
 class BatchCacheQuery(object):
     """ Class to make multiple cache queries into one
@@ -1487,6 +1494,9 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
             return instance_cache_class(**kwargs)
         raise CacheNotRegistered(self.model, key_fields)
 
+    def get_async(self, **kwargs):
+        return self.get_query(**kwargs).resolve_async()
+
     def get_cache_class_for(self, *args):
         """ Find the instance_cache_class for given params
         and return it's cache class.
@@ -1526,6 +1536,9 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
             queryset_cache_class = self.simple_queryset_cache_classes[key_fields]
             return queryset_cache_class(**kwargs)
         raise CacheNotRegistered(self.model, key_fields)
+
+    def filter_async(self, **kwargs):
+        return self.filter_query(**kwargs).resolve_async()
 
     def filter_cache_class_for(self, *args):
         """ Find the queryset_cache_class for given params
