@@ -11,5 +11,5 @@ class FlashCacheLoader(DataLoader):
         batch_query = BatchCacheQuery()
         for i, cache_query in enumerate(cache_queries):
             batch_query.push({i: cache_query})
-        result_dict = batch_query.get()
+        result_dict = batch_query.get(return_exceptions=True)
         return [result_dict[i] for i in range(len(cache_queries))]

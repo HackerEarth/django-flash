@@ -5,7 +5,7 @@ from setuptools import setup
 # setup the project
 setup(
     name="django-flash",
-    version="0.0.1",
+    version="1.0.0",
     author="HackerEarth",
     author_email="support@hackerearth.com",
     description="A cache framework for Django",

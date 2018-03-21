@@ -420,9 +420,9 @@ class Cache(six.with_metaclass(ABCMeta, object)):
 
     def resolve_async(self):
         from .loader import FlashCacheLoader
-        from core.loader_context import LoadersContext
+        from thread_context.dataloader_context import DataLoadersFactory
 
-        loader = LoadersContext.get_loader_for(FlashCacheLoader)
+        loader = DataLoadersFactory.get_loader_for(FlashCacheLoader)
         return loader.load(self)
 
 
@@ -441,7 +441,8 @@ class BatchCacheQuery(object):
         else:
             self.queries.update(kwargs)
 
-    def get(self, only_cache=False, none_on_exception=False):
+    def get(self, only_cache=False, none_on_exception=False,
+            return_exceptions=False):
         all_cache_keys = set()
         coroutines_dict = {}
         value_dict = {}
@@ -475,8 +476,10 @@ class BatchCacheQuery(object):
             try:
                 value = coroutine.send((result_dict, stale_data_dict))
                 value_dict[key] = value
-            except:
-                if none_on_exception:
+            except Exception as e:
+                if return_exceptions:
+                    value_dict[key] = e
+                elif none_on_exception:
                     value_dict[key] = None
                 else:
                     raise
