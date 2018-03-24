@@ -1498,7 +1498,17 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         raise CacheNotRegistered(self.model, key_fields)
 
     def get_async(self, **kwargs):
+        """ await counterpart of get method
+        """
         return self.get_query(**kwargs).resolve_async()
+
+    def get_async_or_none(self, **kwargs):
+        from .loader import object_or_none
+        return object_or_none(self.get_async(**kwargs))
+
+    def get_async_or_404(self, **kwargs):
+        from .loader import object_or_404
+        return object_or_404(self.get_async(**kwargs))
 
     def get_cache_class_for(self, *args):
         """ Find the instance_cache_class for given params
@@ -1541,6 +1551,8 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
         raise CacheNotRegistered(self.model, key_fields)
 
     def filter_async(self, **kwargs):
+        """ await counterpart of filter method.
+        """
         return self.filter_query(**kwargs).resolve_async()
 
     def filter_cache_class_for(self, *args):

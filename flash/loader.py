@@ -1,5 +1,8 @@
 from aiodataloader import DataLoader
 
+from django.core.exceptions import ObjectDoesNotExist
+from django.http import Http404
+
 from .base import BatchCacheQuery
 
 
@@ -13,3 +16,16 @@ class FlashCacheLoader(DataLoader):
             batch_query.push({i: cache_query})
         result_dict = batch_query.get(return_exceptions=True)
         return [result_dict[i] for i in range(len(cache_queries))]
+
+
+async def object_or_none(future):
+    try:
+        return await future
+    except ObjectDoesNotExist:
+        return None
+
+async def object_or_404(future):
+    try:
+        return await future
+    except ObjectDoesNotExist as e:
+        raise Http404(str(e))
