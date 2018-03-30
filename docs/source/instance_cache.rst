@@ -43,8 +43,16 @@ Here's the code to use our newly created cache class:
     # or
     user = UserCacheOnUsername.get(username=username)
 
+
+With newer version of flash, preferably use .resolve() instead of .get()
+
+.. code-block:: python
+
+    user = UserCacheOnUsername(username).resolve()
+
+
 To get result using any type of cache class, you've to use it's :code:`get`
-method. In above code, :code:`UserCacheOnUsername.get` tries to get user from 
+method. In above code, :code:`UserCacheOnUsername.get` tries to get user from
 memcached, if not found then fetches it from
 database and sets it to memcached.
 
@@ -70,7 +78,7 @@ which looks very similar to Django's get query syntax:
 You will soon get to know about it when we come to :code:`ModelCacheManager`
 section.
 
-There are methods :code:`get_or_none` and :code:`get_or_404` on cache 
+There are methods :code:`get_or_none` and :code:`get_or_404` on cache
 manager which you can also use:
 
 .. code-block:: python

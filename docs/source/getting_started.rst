@@ -5,7 +5,8 @@ Getting Started
 For each type of cache query, you need to define a class. You should define
 them in :code:`caches.py` file inside your app. Also you need to put your app
 name inside :code:`FLASH_APPS` settings to get your cache classes registered
-on startup.
+on startup. If settings file doesn't have :code:`FLASH_APPS` setting, then all
+apps in :code:`INSTALLED_APPS` are checked for cache class registration.
 
 There are mainly two types of cache classes :code:`InstanceCache`,
 :code:`QuerysetCache`. There is one more class :code:`BatchCacheQuery`
