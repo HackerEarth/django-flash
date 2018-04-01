@@ -835,7 +835,11 @@ class InstanceCache(six.with_metaclass(InstanceCacheMeta,
         except self.model.DoesNotExist:
             if self.is_simple:
                 # Returning the None so that it gets cached.
-                return DontCache(None)
+                return None
+                # If there is some problem with storing
+                # DoesNotExist as None in cache, then comment upper return
+                # and uncomment below return
+                # return DontCache(None)
             raise
         except:
             raise
