@@ -545,6 +545,9 @@ class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
     def get_using(self):
         return self.model.objects.get_queryset().db
 
+    def get_queryset(self):
+        return self.model.objects.using(self.using)
+
     @instancemethod
     def get(self, *args, **kwargs):
         if USING_KWARG in kwargs:
@@ -828,7 +831,7 @@ class InstanceCache(six.with_metaclass(InstanceCacheMeta,
         Can be overriden in derived classes.
         """
         try:
-            return self.model.objects.using(self.using).get(**filter_dict)
+            return self.get_queryset().get(**filter_dict)
         except self.model.DoesNotExist:
             if self.is_simple:
                 # Returning the None so that it gets cached.
@@ -1068,7 +1071,7 @@ class RelatedInstanceCache(six.with_metaclass(RelatedInstanceCacheMeta,
                 self, instance, signal, using)
 
     def get_instance(self, **filter_dict):
-        dep_instance = self.model.objects.using(self.using).select_related(
+        dep_instance = self.get_queryset().select_related(
                 self.relation).get(**filter_dict)
         instance = dep_instance
         for rel_attr in self.relation.split('__'):
@@ -1130,7 +1133,7 @@ class QuerysetCache(six.with_metaclass(QuerysetCacheMeta,
     def get_result(self, **params):
         """ By default returns the filter queryset's result
         """
-        return list(self.model.objects.using(self.using).filter(**params))
+        return list(self.get_queryset().filter(**params))
 
     def get_value_for_params(self, *args, **kwargs):
         params = self.get_field_dict(*args, **kwargs)
@@ -1199,7 +1202,7 @@ class RelatedQuerysetCache(six.with_metaclass(RelatedQuerysetCacheMeta,
                 self, instance, signal, using)
 
     def get_result(self, **params):
-        qset = self.model.objects.using(self.using).filter(**params).select_related(
+        qset = self.get_queryset().filter(**params).select_related(
             self.relation)
         return list([getattr(i, self.relation) for i in qset])
 
@@ -1214,7 +1217,7 @@ class QuerysetExistsCache(QuerysetCache):
         pass
 
     def get_result(self, **params):
-        return self.model.objects.filter(**params).exists()
+        return self.get_queryset().filter(**params).exists()
 
     def post_process_value(self, value, *args, **kwargs):
         """ It's defined cause cache retuned values are integers (0 or 1)
