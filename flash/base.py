@@ -1290,7 +1290,7 @@ class ModelCacheManagerMeta(ABCMeta):
                     cachemeta_attrs[key] = value
 
             mergable_keys = [
-                'key_fields_list',
+                'get_key_fields_list',
                 'filter_key_fields_list',
                 'cached_foreignkeys'
             ]
@@ -1324,7 +1324,7 @@ class ModelCacheManagerMeta(ABCMeta):
         ncls.instance_cache_classes = []
         ncls.simple_instance_cache_classes = {}
 
-        if hasattr(ncls_instance, 'key_fields_list'):
+        if hasattr(ncls_instance, 'get_key_fields_list'):
             # create instance_cache_classes for assosiated model
             ncls_instance.register_instance_classes()
 
@@ -1417,9 +1417,9 @@ class ModelCacheManager(six.with_metaclass(ModelCacheManagerMeta,
 
     def register_instance_classes(self):
         """ Create InstanceCache classes dynamically
-        for each pair in key_fields_list.
+        for each pair in get_key_fields_list.
         """
-        for key_fields in self.key_fields_list:
+        for key_fields in self.get_key_fields_list:
             class_name = '%sCacheOn' % self.model.__name__
             for field_name in key_fields:
                 class_name += field_name.title()

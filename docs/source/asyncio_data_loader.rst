@@ -23,7 +23,7 @@ E.g. following code registers some cache classes
     class User(Model):
         ...
         class CacheMeta:
-            key_fields_list = [
+            get_key_fields_list = [
                 ('id',),
             ]
             filter_key_fields_list = [

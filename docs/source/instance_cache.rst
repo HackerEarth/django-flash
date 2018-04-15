@@ -39,22 +39,14 @@ Here's the code to use our newly created cache class:
 .. code-block:: python
 
     username = 'bill1992'
-    user = UserCacheOnUsername.get(username)
-    # or
-    user = UserCacheOnUsername.get(username=username)
-
-
-With newer version of flash, preferably use .resolve() instead of .get()
-
-.. code-block:: python
-
     user = UserCacheOnUsername(username).resolve()
+    # or
+    user = UserCacheOnUsername(username=username).resolve()
 
 
-To get result using any type of cache class, you've to use it's :code:`get`
-method. In above code, :code:`UserCacheOnUsername.get` tries to get user from
-memcached, if not found then fetches it from
-database and sets it to memcached.
+:code:`UserCacheOnUsername(username)` create the cache query.
+Calling :code:`.resolve()` method on it tries to get user from
+memcached, if not found then fetches it from database and sets it to memcached.
 
 If user is not found then it will raise :code:`User.DoesNotExist` exception,
 which is similar in behaviour if we'd written:
@@ -94,7 +86,7 @@ Override get_instance
 #####################
 
 The current behaviour of InstanceCache derived classes is to use
-:code:`<model>.objects.get` on given parameters as fallback method if
+:code:`<model>.objects.get()` on given parameters as fallback method if
 value not found in memcached.
 You can override this behaviour by defining :code:`get_instance`
 method in the class.
@@ -118,13 +110,16 @@ Then you do it by
         key_fields = ('user',)
 
         def get_instance(self, user):
-            avatars = Avatar.objects.filter(user=user, primary=True)
+            avatars = self.get_queryset().filter(user=user, primary=True)
             if avatars:
                 return avatars[0]
             return None
 
     # Use above cache class
-    avatar = PrimaryAvatarCacheOnUser.get(user=user)
+    avatar = PrimaryAvatarCacheOnUser(user=user).resolve()
+
+Here, :code:`self.get_queryset()` will return a queryset on :code:`Avatar`
+model. It takes care of which db to make query on.
 
 In this case, this cache class will never raise :code:`Avatar.DoesNotExist`
 exception since it is setting :code:`None` in memcached against the key
@@ -152,13 +147,13 @@ And here are the different ways to use this cache class
 .. code-block:: python
 
     # If parameters given as args, taken in same order of key_fields
-    participation = ParticipationCacheOnUserEvent.get(user, event)
+    participation = ParticipationCacheOnUserEvent(user, event).resolve()
 
     # Parameters can be given in hibrid form too (args & kwargs)
-    participation = ParticipationCacheOnUserEvent.get(user, event=event)
+    participation = ParticipationCacheOnUserEvent(user, event=event).resolve()
 
     # Parameters can be given in any order if given as kwargs
-    participation = ParticipationCacheOnUserEvent.get(event=event, user=user)
+    participation = ParticipationCacheOnUserEvent(event=event, user=user).resolve()
 
     # Parameters must be given as kwargs when using cache manager
     participation = Participation.cache.get(user=user, event=event)

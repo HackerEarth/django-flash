@@ -29,7 +29,7 @@ You can define model cache manager class derived from
 
     class UserCacheManager(ModelCacheManager):
         model = User
-        key_fields_list = [
+        get_key_fields_list = [
             ('id',),
             ('username',),
         ]
@@ -48,7 +48,7 @@ and you can use both caches on :code:`User.cache` . E.g.
 And in fact, :code:`User.cache` is an instance of :code:`UserCacheManager`
 class.
 In this case, two instnace cache clases gets created behind the scene using
-:code:`key_fields_list` attribute on UserCacheManager.
+:code:`get_key_fields_list` attribute on UserCacheManager.
 And in last section, an automatic ModelCacheManager class was being created
 when we were using :code:`User.cache` but hadn't defined any ModelCacheManager
 for User.

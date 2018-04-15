@@ -17,7 +17,7 @@ E.g. existance check or count query. You should use QuerysetCache.
         key_fields = ('user',)
 
     # Using cache class
-    participation_list = ParticipationListCacheOnUser.get(user=user)
+    participation_list = ParticipationListCacheOnUser(user=user).resolve()
 
 
 The above class will cache list of all participants for a single user.
@@ -33,11 +33,11 @@ by overriding default :code:`get_result` method.
         key_fields = ('user',)
 
         def get_result(self, user):
-            event_ids = Participation.objects.filter(
-                            user=user).values_list('event', flat=True)
+            event_ids = self.get_queryset().filter(user=user).values_list(
+                            'event', flat=True)
             return event_ids
 
-    event_ids = ParticipatedEventIdListCacheOnUser.get(user)
+    event_ids = ParticipatedEventIdListCacheOnUser(user).resolve()
 
 
 Or if you want to cache the count of the participation of single user
@@ -50,10 +50,9 @@ Or if you want to cache the count of the participation of single user
         key_fields = ('user',)
 
         def get_result(self, user):
-            return Participation.objects.filter(
-                            user=user).count()
+            return self.get_queryset().filter(user=user).count()
 
-    participation_count = ParticipationCountCacheOnUser.get(user)
+    participation_count = ParticipationCountCacheOnUser(user).resolve()
 
 
 You can also use ModelCacheManger to define default QuerysetCache.
@@ -64,7 +63,7 @@ E.g. :code:`ParticipationListCacheOnUser`'s behaviour can be achieved by
 
     class ParticipationCacheManager(ModelCacheManger):
         model = Participation
-        key_fields_list = [
+        get_key_fields_list = [
             ('user', 'event')
         ]
         filter_key_fields_list = [
@@ -75,14 +74,14 @@ E.g. :code:`ParticipationListCacheOnUser`'s behaviour can be achieved by
 
 
 You can also define some supporting methods on ParticipationCacheManager class
-for other cache classes deined above
+for other cache classes defined above
 
 
 .. code-block:: python
 
     class ParticipationCacheManager(ModelCacheManger):
         model = Participation
-        key_fields_list = [
+        get_key_fields_list = [
             ('user', 'event')
         ]
         filter_key_fields_list = [
@@ -90,10 +89,10 @@ for other cache classes deined above
         ]
 
         def get_count_for_user(self, user):
-            return ParticipationCountCacheOnUser.get(user)
+            return ParticipationCountCacheOnUser(user).resolve()
 
         def get_event_id_list_for_user(self, user):
-            return ParticipatedEventIdListCacheOnUser.get(user)
+            return ParticipatedEventIdListCacheOnUser(user).resolve()
 
     # Use the methods
     participation_count = Participation.cache.get_count_for_user(user)

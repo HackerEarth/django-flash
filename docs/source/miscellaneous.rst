@@ -10,7 +10,7 @@ CacheMeta
 
 If you are too lazy to create ModelCacheManager class for a model in
 <some_app>/caches.py, then you can just create CacheMeta class inside your model
-and define attributes like key_fields_list, filter_key_fields_list etc.
+and define attributes like get_key_fields_list, filter_key_fields_list etc.
 
 E.g.
 
@@ -23,7 +23,7 @@ E.g.
         # other fields
 
         class CacheMeta:
-            key_fields_list = [
+            get_key_fields_list = [
                 ('id',),
                 ('slug',),
             ]
@@ -73,7 +73,7 @@ E.g. change above code to
     event = participation.event
 
 **Note**: cached_foreignkeys will work only if related model has cache class
-registered (by InstanceCache or key_fields_list) on it's primary key and
+registered (by InstanceCache or get_key_fields_list) on it's primary key and
 :code:`get_instance` method is not overridden.
 
 
@@ -173,8 +173,8 @@ getting invalidated very frequently, then you may get okay with serving stale da
 for some time (let's say for few seconds to minutes).
 
 You may come up with the solution of making invalidation OFF and putting the timeout
-little. But this costs you even when there is no change in your model and every
-time db query happenns after the timeout.
+little. But this costs you even when there is no change in your model and
+db query happens everytime after the timeout.
 
 So instead of doing this you can put :code:`allowtime` attribute and make
 invalidation DYNAMIC. It will allow the value to be stale for given time but

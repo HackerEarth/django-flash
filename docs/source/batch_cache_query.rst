@@ -14,7 +14,7 @@ E.g. following code registers some cache classes
 
     class UserCacheManager(ModelCacheManager):
         model = User
-        key_fields_list = [
+        get_key_fields_list = [
             ('id',),
             ('username',),
         ]
@@ -45,9 +45,7 @@ then you can get both instances in single memcached query.
 In above code, :code:`User.cache.get_query(id=user_id)` and :code:`EventCacheOnSlug(event_slug)`
 are lazy cache queries which contains passed parameters to be used while
 creating key. :code:`User.cache.get_query(id=user_id)` is lazy
-counterpart of :code:`User.cache.get(id=user_id)` and
-:code:`EventCacheOnSlug(event_slug)` is lazy counterpart of
-:code:`EventCacheOnSlug.get(event_slug)`.
+counterpart of :code:`User.cache.get(id=user_id)`.
 
 :code:`batch_query.get()` returns a dict with same keys given to
 BatchCacheQuery() and values as corresponding queries' result evaluated.
@@ -56,7 +54,8 @@ In above query, if any one of both cache query raises DoesNotExist exception
 then :code:`batch_query.get()` will also raise the exception. One of the
 methods to escape from this situation is to pass :code:`none_on_exception=True`
 to :code:`batch_query.get()`, then it will put value as :code:`None` in case of
-exception.
+exception. You can pass :code:`return_exceptions=True` to it which would return
+exception objects as results if few cache queries raised some exceptions.
 
 If you want that :code:`batch_query.get()` should not go for fallback db
 methods if value is not found in cache then you may pass :code:`only_cache=True`
