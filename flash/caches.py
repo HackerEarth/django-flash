@@ -5,7 +5,7 @@ from flash.constants import CACHE_TIME_M
 
 class CacheDynamicVersionCacheManager(ModelCacheManager):
     model = CacheDynamicVersion
-    key_fields_list = [
+    get_key_fields_list = [
         ('cache_type', 'cache_name'),
     ]
 

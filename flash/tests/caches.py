@@ -7,14 +7,14 @@ from .models import ModelA, ModelB, ModelC, ModelD
 
 class ModelACacheManager(ModelCacheManager):
     model = ModelA
-    key_fields_list = [
+    get_key_fields_list = [
         ('num',),
     ]
 
 
 class ModelBCacheManager(ModelCacheManager):
     model = ModelB
-    key_fields_list = [
+    get_key_fields_list = [
         ('a',)
     ]
     filter_key_fields_list = [
