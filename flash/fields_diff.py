@@ -78,8 +78,9 @@ def get_simple_fields(instance):
 
 def save_state(instance):
     for field in get_simple_fields(instance):
-        instance._statediff.state[field.attname] = getattr(instance,
-                field.attname)
+        if field.attname in instance.__dict__:
+            instance._statediff.state[field.attname] = instance.__dict__[
+                    field.attname]
 
 
 @receiver(post_init)
@@ -100,8 +101,8 @@ def pre_save_statediff(sender, instance, **kwargs):
             save_state(instance)
         instance._statediff.diff = AttrDict()
         for field in get_simple_fields(instance):
-            if hasattr(instance, field.attname):
-                post_value = getattr(instance, field.attname)
+            if field.attname in instance.__dict__:
+                post_value = instance.__dict__[field.attname]
                 if not instance._state.adding:
                     if field.attname in instance._statediff.state:
                         pre_value = instance._statediff.state.get(field.attname)
