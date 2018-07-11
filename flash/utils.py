@@ -1,13 +1,19 @@
+import re
 import base64
 import hashlib
 from collections import defaultdict
 
+
+ACCEPTABLE_KEY_REGEX = r"^[\w\d_-]+$"
+acceptable_key_regex_pattern = re.compile(ACCEPTABLE_KEY_REGEX)
 
 def memcache_key_escape(key):
     """
     if isinstance(key, unicode):
         key = key.encode('utf-8')
     """
+    if acceptable_key_regex_pattern.match(key):
+        return key
     if not key.isalnum():
         chars = []
         for c in key:

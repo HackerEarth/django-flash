@@ -31,11 +31,17 @@ except ImportError:
     from django.db.models.fields.related_descriptors import \
         ForwardManyToOneDescriptor as ReverseSingleRelatedObjectDescriptor
 
+GenericForeignKeyObject = None
 def importGenericForeignKey():
+    global GenericForeignKeyObject
+    if GenericForeignKeyObject is not None:
+        return GenericForeignKeyObject
     try:
         from django.contrib.contenttypes.generic import GenericForeignKey
+        GenericForeignKeyObject = GenericForeignKey
     except ImportError:
         from django.contrib.contenttypes.fields import GenericForeignKey
+        GenericForeignKeyObject = GenericForeignKey
     return GenericForeignKey
 
 
@@ -85,6 +91,9 @@ class StaleData(object):
 
 
 def cache_get_many(keys):
+    if not keys:
+        return {}, {}
+
     d = cache.get_many(keys)
     result_dict = {}
     stale_data_dict = {}
