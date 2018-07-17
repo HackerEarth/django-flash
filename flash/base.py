@@ -71,7 +71,10 @@ def instancemethod(method):
             if ins is None:
                 # when method is called from class
                 # get instance of that class and use that
-                ins = cls()
+                try:
+                    ins = cls()
+                except NameError:
+                    return method
             return partial(method, ins)
     return MethodDisc()
 
@@ -552,7 +555,7 @@ class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
         pass
 
     def get_using(self):
-        return self.model.objects.get_queryset().db
+        return flash_settings.db_discoverer_func(self.model)
 
     def get_queryset(self):
         return self.model.objects.using(self.using)

@@ -8,3 +8,9 @@ DEFAULT_TIMEOUT = getattr(settings, 'FLASH_DEFAULT_TIMEOUT', CACHE_TIME_WEEK)
 DONT_USE_CACHE = getattr(settings, 'FLASH_DONT_USE_CACHE', False)
 WRITE_LOCK_TIMEOUT = getattr(settings, 'FLASH_WRITE_LOCK_TIMEOUT',
                             CACHE_TIME_30S)
+
+def default_db_discoverer_func(model):
+    return 'default'
+
+db_discoverer_func = getattr(settings, 'FLASH_DB_DISCOVERER_FUNC',
+    default_db_discoverer_func)
