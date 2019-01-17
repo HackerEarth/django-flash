@@ -1,7 +1,7 @@
-import six
 import time
 import copy
 
+from django.utils import six
 from distutils.version import StrictVersion
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import defaultdict
