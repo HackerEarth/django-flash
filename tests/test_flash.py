@@ -1,8 +1,9 @@
 import time
 
+from django.test import TestCase
+
 from flash.base import cache, BatchCacheQuery
 
-from .utils import TestCase
 from .models import ModelA, ModelB, ModelC, ModelD
 from .caches import BCacheOnNum, AListCacheOnD
 

@@ -14,4 +14,5 @@ setup(
         'flash',
     ],
     zip_safe=False,
+    test_suite='runtests.runtests',
 )
