@@ -639,10 +639,10 @@ class BaseModelQueryCache(six.with_metaclass(BaseModelQueryCacheMeta, Cache)):
                 value = field_dict[field.attname]
             if isinstance(value, models.Model):
                 # get the pk value on instance
-                if field.rel:
-                    rel_model = field.rel.to
+                if field.remote_field:
+                    rel_model = field.remote_field.model
                 else:
-                    # In very rare cases, field.rel is found to be None
+                    # In very rare cases, field.remote_field is found to be None
                     # that I do not know why.
                     # fallback method to get rel_model
                     rel_model = value.__class__
@@ -869,7 +869,7 @@ class InstanceCache(six.with_metaclass(InstanceCacheMeta,
                 delattr(instance, attr)
 
         for field in instance._meta.fields:
-            if field.rel:
+            if field.remote_field:
                 attr = '_%s_cache' % field.name
                 if hasattr(instance, attr):
                     delattr(instance, attr)
@@ -959,7 +959,7 @@ class RelatedInstanceCacheMeta(InstanceCacheMeta):
         relation_splits = ncls.relation.split('__')
         relation_str = ''
         for field_name in relation_splits:
-            rel_model = rel_model._meta.get_field(field_name).rel.to
+            rel_model = rel_model._meta.get_field(field_name).remote_field.model
             if relation_str:
                 relation_str += '__%s' % field_name
             else:
@@ -975,7 +975,7 @@ class RelatedModelInvalidationCache(object):
     """ Mixin class used in RelatedInstanceCache, RelatedQuerysetCache
     """
     def _get_invalidation_models(self):
-        return [self.model] + self.rel_models.keys()
+        return [self.model] + list(self.rel_models)
 
     def _get_keys_to_be_invalidated(self, instance, signal, using):
         keys = []
@@ -1173,7 +1173,7 @@ class RelatedQuerysetCacheMeta(QuerysetCacheMeta):
         relation_splits = ncls.relation.split('__')
         relation_str = ''
         for field_name in relation_splits:
-            rel_model = rel_model._meta.get_field(field_name).rel.to
+            rel_model = rel_model._meta.get_field(field_name).remote_field.model
             if relation_str:
                 relation_str += '__%s' % field_name
             else:
@@ -1267,7 +1267,7 @@ class CachedReverseSingleRelatedObjectDescriptor(
                 # If NULL is an allowed value, return it.
                 if self.field.null:
                     return None
-                raise self.field.rel.to.DoesNotExist
+                raise self.field.remote_field.model.DoesNotExist
             rel_obj = self.cache_class.get(val)
             setattr(instance, self.cache_name, rel_obj)
             return rel_obj
@@ -1385,7 +1385,7 @@ class ModelCacheManagerMeta(ABCMeta):
         for model, cached_foreignkeys in cls.model_cached_foreignkeys.items():
             for key in cached_foreignkeys:
                 try:
-                    rel_model = model._meta.get_field(key).rel.to
+                    rel_model = model._meta.get_field(key).remote_field.model
                     rel_model_pk_name = rel_model._meta.pk.name
                     cache_class = rel_model.cache.get_cache_class_for(
                         rel_model_pk_name)
@@ -1395,7 +1395,7 @@ class ModelCacheManagerMeta(ABCMeta):
                     assert False, ("Cached foreignkey can't be made on field "+
                                    "`%s` of %s. Because %s is not cached on "+
                                    "it's primary key") % (
-                        key, model, model._meta.get_field(key).rel.to)
+                        key, model, model._meta.get_field(key).remote_field.model)
 
 
     @classmethod
