@@ -9,4 +9,4 @@ DATABASES = {
         'NAME': 'default',
         'ENGINE': 'django.db.backends.sqlite3',
     },
-    }
+}

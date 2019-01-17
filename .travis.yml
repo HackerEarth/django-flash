@@ -32,7 +32,7 @@ matrix:
   allow_failures:
   - env: DJANGO=master
 install:
-  - travis_retry pip install -U tox-travis
+- travis_retry pip install -U tox-travis
 
 script:
 - tox
