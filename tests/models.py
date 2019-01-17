@@ -9,12 +9,12 @@ class ModelA(models.Model):
 class ModelB(models.Model):
     num = models.IntegerField()
     text = models.CharField(max_length=50)
-    a = models.ForeignKey(ModelA)
+    a = models.ForeignKey(ModelA, on_delete=models.CASCADE)
 
 
 class ModelC(models.Model):
-    a = models.ForeignKey(ModelA)
-    b = models.ForeignKey(ModelB)
+    a = models.ForeignKey(ModelA, on_delete=models.CASCADE)
+    b = models.ForeignKey(ModelB, on_delete=models.CASCADE)
     num = models.IntegerField()
 
 
