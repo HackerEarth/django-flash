@@ -1,5 +1,4 @@
-import six
-
+from django.utils import six
 from collections import defaultdict
 from functools import wraps
 

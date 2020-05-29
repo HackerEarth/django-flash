@@ -1,8 +1,9 @@
 import time
 
+from django.test import TestCase
+
 from flash.base import cache, BatchCacheQuery
 
-from .utils import TestCase
 from .models import ModelA, ModelB, ModelC, ModelD
 from .caches import BCacheOnNum, AListCacheOnD
 
@@ -166,7 +167,7 @@ class BatchCacheQueryTest(CacheTestCase):
             2: BCacheOnNum(num=2),
         }).get(only_cache=True)
 
-        self.assertTrue(result.keys() == [1])
+        self.assertEqual(list(result), [1])
 
         result = BatchCacheQuery({
             1: ModelA.cache.get_query(num=1),
